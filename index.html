@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Melting Snowman</title>
+<style>
+/*
+VOICE: loud, happy classroom game show on a winter night
+IDEA: a hangman-style word board where the sun slowly melts Frosty
+PICTURE: a big drawn Frosty beside the word; he shrinks into a puddle as wrong letters pile up
+COLOUR and TYPE: navy night, cream letters, pink / yellow / teal accents; Trebuchet MS
+LAYOUT: thin header, Frosty left and the word board right, team scoreboard along the bottom
+*/
+:root{--navy:#1E1B2E;--navy2:#2B2740;--navy3:#3A3555;--cream:#FBF7F0;--pink:#E8467C;--yellow:#F2C14E;--teal:#5BC0BE;--soft:#CFC8E8;--font:'Trebuchet MS',Verdana,sans-serif;color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(ellipse at 50% -10%,#3A3560 0%,var(--navy) 62%);color:var(--cream);font-family:var(--font);overflow:hidden}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:4px solid var(--yellow);outline-offset:4px}
+#snow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+
+header{display:flex;align-items:center;gap:12px;padding:12px 24px}
+.brand{font-weight:700;font-size:clamp(18px,2.6vmin,30px);color:var(--yellow);margin:0}
+.label{font-size:clamp(16px,2.4vmin,28px);padding:6px 18px;border-radius:999px;background:var(--navy2);margin-right:auto}
+.tool{font-size:clamp(14px,2vmin,22px);padding:8px 16px;min-height:44px;border-radius:999px;border:2px solid var(--navy3);background:transparent;color:var(--cream)}
+.tool:hover{background:var(--navy2)}
+.tool[hidden]{display:none}
+
+main{display:flex;justify-content:center;padding:1vmin 4vw;min-height:0}
+.view{width:100%;max-width:1600px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vmin;animation:enter .35s ease-out}
+@keyframes enter{from{opacity:0;transform:translateY(12px)}}
+
+.title{font-size:11vmin;line-height:1.02;margin:0;font-weight:700;text-wrap:balance}
+.title.multi{font-size:clamp(28px,7vmin,80px)}
+.round-tag{font-size:4.4vmin;font-weight:700;color:var(--yellow);margin:0}
+.sub{font-size:4.6vmin;margin:0;color:var(--soft)}
+.sub b{color:var(--teal)}
+.row{display:flex;gap:2vmin;flex-wrap:wrap;align-items:center}
+
+.btn{font-size:clamp(22px,4.4vmin,50px);font-weight:700;line-height:1;padding:.5em 1.3em;border-radius:999px;border:0;background:var(--pink);color:var(--cream);box-shadow:0 .14em 0 #9C2350;transition:transform .1s}
+.btn:active{transform:translateY(.08em);box-shadow:0 .06em 0 #9C2350}
+.btn.ghost{background:transparent;border:3px solid var(--cream);box-shadow:none}
+.btn.small{font-size:clamp(16px,3vmin,32px)}
+
+.split{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);align-items:center;gap:4vw;width:100%;height:100%}
+.art{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;max-height:70vh;gap:1.5vmin}
+.frosty{height:100%;width:auto;max-width:100%;min-height:0;flex:1;overflow:visible}
+.panel{display:flex;flex-direction:column;align-items:flex-start;gap:2.6vmin}
+
+.man,.sun,.puddle{transition:transform .9s cubic-bezier(.3,1.4,.5,1),opacity .9s}
+.dance .frosty{animation:dance 1s ease-in-out infinite alternate;transform-origin:37% 95%}
+@keyframes dance{from{transform:rotate(-6deg)}to{transform:rotate(6deg) translateY(-2%)}}
+.shake .frosty{animation:shake .45s}
+@keyframes shake{25%{transform:translateX(-2%)}75%{transform:translateX(2%)}}
+
+.field{display:flex;align-items:center;gap:2vmin}
+.field-label{font-size:3.8vmin;font-weight:700;width:18vmin}
+.choices{display:flex;gap:1.4vmin;flex-wrap:wrap}
+.choice{min-width:9vmin;min-height:44px;font-size:3.8vmin;font-weight:700;padding:.3em .5em;border-radius:18px;border:3px solid var(--navy3);background:var(--navy2);color:var(--cream)}
+.choice.on{background:var(--yellow);border-color:var(--yellow);color:var(--navy)}
+
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2vmin;width:100%}
+.step{background:var(--navy2);border:3px solid var(--navy3);border-radius:24px;padding:1.6vmin;text-align:center}
+.step-icon{display:block;font-size:6vmin;line-height:1.1}
+.step p{font-size:2.8vmin;margin:.8vmin 0 0;line-height:1.15}
+.step b{color:var(--yellow)}
+
+.status{font-size:5.4vmin;font-weight:700;margin:0;line-height:1.15;min-height:1.2em}
+.status.win{color:var(--teal)}
+.status.lose{color:var(--pink)}
+.word{display:flex;gap:1.6vmin;flex-wrap:wrap}
+.slot{width:9.5vmin;height:12vmin;display:grid;place-items:end center;border-bottom:1.1vmin solid var(--cream);font-size:10vmin;font-weight:700;line-height:1;padding-bottom:.6vmin}
+.slot.shown{animation:flip .4s cubic-bezier(.2,1.6,.4,1)}
+@keyframes flip{from{transform:scale(.3);opacity:0}}
+.slot.missed{color:var(--pink)}
+.clue{display:flex;align-items:center;gap:2vmin;min-height:10vmin}
+.clue-icon{font-size:10vmin;line-height:1}
+.clue-text{font-size:3.4vmin;margin:0;color:var(--soft)}
+.melts{display:flex;align-items:center;gap:1.2vmin;font-size:3.2vmin;font-weight:700;margin:0}
+.melts span{display:inline-block;width:3.6vmin;height:3.6vmin;border-radius:50%;background:var(--teal);transition:background .3s,transform .3s}
+.melts span.used{background:var(--navy3);transform:scale(.7)}
+.keys{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:1vmin;width:100%}
+.key{aspect-ratio:1/1.05;font-size:3.8vmin;font-weight:700;border-radius:14px;border:0;background:var(--cream);color:var(--navy);box-shadow:0 .5vmin 0 #B9B2D3}
+.key:disabled{cursor:default;box-shadow:none}
+.key.hit{background:var(--teal);color:var(--navy)}
+.key.miss{background:var(--navy2);color:#6E6890}
+
+.tag{display:inline-block;color:var(--c);white-space:nowrap}
+.ranks{display:flex;flex-direction:column;gap:1.4vmin;width:100%}
+.rank{display:grid;grid-template-columns:30vmin minmax(0,1fr) 8vmin;align-items:center;gap:2vmin;font-size:4vmin;font-weight:700}
+.rank-bar{height:3.6vmin;border-radius:99px;background:var(--navy2);overflow:hidden}
+.rank-bar i{display:block;height:100%;border-radius:99px}
+.rank-num{text-align:right}
+
+footer{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:12px;padding:10px 24px 18px}
+footer[hidden]{display:none}
+.chip{position:relative;border-radius:22px;background:var(--navy2);border-top:9px solid var(--c);transition:box-shadow .3s,transform .3s}
+.chip.turn{box-shadow:0 0 0 4px var(--c);transform:translateY(-6px)}
+.chip-main{width:100%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 12px 12px;border:0;background:transparent;color:var(--cream);border-radius:22px}
+.chip-main:hover{background:var(--navy3)}
+.chip-name{font-size:clamp(15px,2.6vmin,30px);font-weight:700;color:var(--c);white-space:nowrap}
+.chip-score{font-size:clamp(28px,6.4vmin,72px);font-weight:700;line-height:1}
+.chip-minus{position:absolute;top:6px;right:6px;width:36px;height:36px;border-radius:50%;border:2px solid var(--navy3);background:var(--navy);color:var(--cream);font-size:22px;line-height:1;opacity:.55}
+.chip-minus:hover{opacity:1}
+.chip.pop .chip-score{animation:pop .45s cubic-bezier(.2,1.8,.4,1)}
+@keyframes pop{from{transform:scale(1.7);color:var(--c)}}
+.hint{grid-column:1/-1;margin:0;font-size:clamp(12px,1.6vmin,16px);color:#8F88AD;text-align:center}
+
+@media (max-width:700px){
+  .split{grid-template-columns:1fr;height:auto}
+  .art{max-height:30vh}
+  .keys{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .steps{grid-template-columns:1fr}
+  footer{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="snow" aria-hidden="true"></canvas>
+<div class="app">
+  <header>
+    <p class="brand">☃️ Melting Snowman</p>
+    <span class="label" id="label"></span>
+    <button class="tool" id="finish" type="button">🏆 Finish</button>
+    <button class="tool" id="mute" type="button">🔊 Sound</button>
+    <button class="tool" id="full" type="button">Full screen</button>
+  </header>
+  <main id="stage" aria-live="polite"></main>
+  <footer id="board"></footer>
+</div>
+
+<script>
+{
+const WORDS = [
+  {word:'SNOW',    icon:'❄️'}, {word:'HAT',     icon:'🎩'}, {word:'SUN',   icon:'☀️'},
+  {word:'DANCE',   icon:'🕺'}, {word:'STOP',    icon:'🛑'}, {word:'TOWN',  icon:'🏘️'},
+  {word:'SNOWMAN', icon:'☃️'}, {word:'MAGIC',   icon:'✨'}, {word:'HAPPY', icon:'😄'},
+  {word:'BROOM',   icon:'🧹'}, {word:'GOODBYE', icon:'👋'}, {word:'RUN',   icon:'🏃'}
+];
+const TEAMS = [
+  {name:'Snowflakes', icon:'❄️', color:'#5BC0BE'},
+  {name:'Mittens',    icon:'🧤', color:'#E8467C'},
+  {name:'Scarves',    icon:'🧣', color:'#F2C14E'},
+  {name:'Carrots',    icon:'🥕', color:'#F28C4E'},
+  {name:'Hats',       icon:'🎩', color:'#A99BF5'},
+  {name:'Skaters',    icon:'⛸️', color:'#7FB5E6'}
+];
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const MAX_MELT = 6;
+const SOLVE_BONUS = 2;
+
+const state = {view:'setup', teamCount:4, wordCount:8, scores:[0,0,0,0,0,0], order:[], round:0,
+  guessed:new Set(), wrong:0, turn:0, status:'play', clue:false, muted:false, back:null};
+
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), board = $('#board');
+const current = () => WORDS[state.order[state.round]];
+
+const sound = {
+  ctx:null,
+  init(){
+    if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(this.ctx && this.ctx.state==='suspended') this.ctx.resume().catch(()=>{});
+  },
+  tone(freq, dur, {type='triangle', vol=.18, at=0}={}){
+    if(state.muted || !this.ctx) return;
+    const t = this.ctx.currentTime + at, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t+.02);
+    g.gain.exponentialRampToValueAtTime(.0001, t+dur);
+    o.connect(g).connect(this.ctx.destination);
+    o.start(t); o.stop(t+dur+.05);
+  },
+  hit(){ this.tone(988, .12); this.tone(1319, .22, {at:.08}); },
+  miss(){ this.tone(330, .25, {type:'sawtooth', vol:.08}); this.tone(247, .35, {type:'sawtooth', vol:.08, at:.15}); },
+  win(){ [523,659,784].forEach((f,i)=>this.tone(f, .3, {at:i*.13})); this.tone(1047, .8, {at:.4}); },
+  melt(){ [523,466,415,349,262].forEach((f,i)=>this.tone(f, .35, {vol:.1, at:i*.18})); }
+};
+
+const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; };
+const teamTag = i => `<span class="tag" style="--c:${TEAMS[i].color}">${TEAMS[i].icon} ${TEAMS[i].name}</span>`;
+const btn = (text, action, {primary=false, kind=''}={}) => `<button class="btn ${kind}" type="button" data-action="${action}"${primary?' data-primary':''}>${text}</button>`;
+const choices = (key, values) => `<div class="choices">${values.map(n=>`<button class="choice${n===state[key]?' on':''}" type="button" data-action="${key}" data-n="${n}">${n}</button>`).join('')}</div>`;
+const steps = list => `<div class="steps">${list.map(([icon,text])=>`<div class="step"><span class="step-icon">${icon}</span><p>${text}</p></div>`).join('')}</div>`;
+
+const frosty = id => `<svg class="frosty" viewBox="0 0 300 320" role="img" aria-label="Frosty the Snowman">
+  <defs><radialGradient id="snow-${id}" cx="38%" cy="30%" r="78%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".62" stop-color="#ECF1F8"/><stop offset="1" stop-color="#AFBDD4"/></radialGradient></defs>
+  <g class="sun" style="transform-origin:262px 46px">
+    <g stroke="#F2C14E" stroke-width="5" stroke-linecap="round"><path d="M262 8v12M262 72v12M224 46h12M288 46h12M235 19l8 8M281 65l8 8M289 19l-8 8M243 65l-8 8"/></g>
+    <circle cx="262" cy="46" r="20" fill="#F2C14E"/>
+  </g>
+  <ellipse class="puddle" cx="110" cy="304" rx="70" ry="12" fill="#9FC3E3" style="transform-origin:110px 304px"/>
+  <g class="man" style="transform-origin:110px 304px">
+    <g stroke="#7A4A2A" stroke-width="5" stroke-linecap="round" fill="none"><path d="M66 160 L18 122 M36 136 L24 112 M36 136 L12 140"/><path d="M154 160 L202 122 M184 136 L196 112 M184 136 L208 140"/></g>
+    <circle cx="110" cy="240" r="64" fill="url(#snow-${id})"/>
+    <circle cx="110" cy="158" r="48" fill="url(#snow-${id})"/>
+    <circle cx="110" cy="88" r="36" fill="url(#snow-${id})"/>
+    <g fill="#1E1B2E"><circle cx="110" cy="146" r="5"/><circle cx="110" cy="166" r="5"/><circle cx="110" cy="186" r="5"/><circle cx="97" cy="80" r="4.5"/><circle cx="123" cy="80" r="4.5"/><circle cx="96" cy="101" r="2.4"/><circle cx="103" cy="105" r="2.4"/><circle cx="110" cy="107" r="2.4"/><circle cx="117" cy="105" r="2.4"/><circle cx="124" cy="101" r="2.4"/></g>
+    <path d="M110 87 L148 93 L110 97 Z" fill="#F28C4E"/>
+    <path d="M70 116 Q110 132 150 116 L150 129 Q110 145 70 129 Z" fill="#E8467C"/>
+    <rect x="128" y="124" width="16" height="44" rx="6" fill="#E8467C" transform="rotate(-12 136 126)"/>
+    <rect x="80" y="10" width="60" height="50" rx="4" fill="#15131F"/>
+    <rect x="80" y="43" width="60" height="9" fill="#F2C14E"/>
+    <rect x="64" y="56" width="92" height="10" rx="5" fill="#15131F"/>
+  </g>
+</svg>`;
+
+function meltTo(w){
+  const svg = stage.querySelector('.frosty');
+  if(!svg) return;
+  const melted = w>=MAX_MELT;
+  const sy = melted ? .06 : 1 - w*.12, sx = melted ? 1.6 : 1 + w*.05;
+  svg.querySelector('.man').style.transform = `scale(${sx},${sy})`;
+  svg.querySelector('.man').style.opacity = melted ? .7 : 1;
+  svg.querySelector('.puddle').style.transform = `scaleX(${.25 + w*.3})`;
+  svg.querySelector('.puddle').style.opacity = .25 + w*.12;
+  svg.querySelector('.sun').style.transform = `scale(${.6 + w*.16})`;
+}
+
+const VIEWS = {
+  setup: () => `<div class="split">
+    <div class="art">${frosty('setup')}</div>
+    <div class="panel">
+      <h1 class="title">Melting<br>Snowman</h1>
+      <p class="sub">Find the word before the <b>sun</b> melts Frosty!</p>
+      ${steps([['🔤','Your team says a <b>letter</b>.'],['✅','Right letter? <b>+1</b> point!'],['☀️','Wrong letter? Frosty <b>melts</b>!']])}
+      <div class="field"><span class="field-label">Teams</span>${choices('teamCount',[2,3,4,5,6])}</div>
+      <div class="field"><span class="field-label">Words</span>${choices('wordCount',[5,8,12])}</div>
+      ${btn('Start ▶','start',{primary:true})}
+    </div></div>`,
+
+  play: () => `<div class="split">
+    <div class="art" id="art">${frosty('play')}<p class="melts" id="melts"></p></div>
+    <div class="panel">
+      <p class="status" id="status"></p>
+      <div class="word" id="word"></div>
+      <div class="clue" id="clue"></div>
+      <div class="keys" id="keys">${LETTERS.map(l=>`<button class="key" type="button" data-letter="${l}">${l}</button>`).join('')}</div>
+      <div class="row" id="actions"></div>
+    </div></div>`,
+
+  winner: () => {
+    const scores = state.scores.slice(0, state.teamCount), max = Math.max(...scores);
+    const top = scores.map((v,i)=>v===max?i:-1).filter(i=>i>=0);
+    const rows = scores.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
+    return `<div class="split">
+      <div class="art dance">${frosty('win')}</div>
+      <div class="panel">
+        <p class="round-tag">${top.length>1?'It’s a tie!':'The winner is…'}</p>
+        <h1 class="title${top.length>1?' multi':''}">${top.map(teamTag).join('<br>')}</h1>
+        <div class="ranks">${rows.map(r=>`<div class="rank"><span>${teamTag(r.i)}</span><div class="rank-bar"><i style="width:${max?r.v/max*100:0}%;background:${TEAMS[r.i].color}"></i></div><span class="rank-num">${r.v}</span></div>`).join('')}</div>
+        <div class="row">${btn('Play again','reset',{primary:true})}${state.back?btn('Back to game','back',{kind:'ghost'}):''}</div>
+      </div></div>`;
+  }
+};
+
+const LABELS = {
+  setup: () => 'Set up',
+  play: () => `Word ${state.round+1} of ${state.order.length}`,
+  winner: () => 'Results'
+};
+
+function render(){
+  stage.innerHTML = `<div class="view">${VIEWS[state.view]()}</div>`;
+  $('#label').textContent = LABELS[state.view]();
+  $('#finish').hidden = state.view!=='play';
+  board.hidden = state.view!=='play';
+  renderBoard();
+  if(state.view==='play') updatePlay();
+}
+
+function updatePlay(){
+  const {word, icon} = current();
+  $('#word').innerHTML = word.split('').map(l=>{
+    const shown = state.guessed.has(l) || state.status==='lose';
+    const cls = shown ? (state.guessed.has(l) ? ' shown' : ' missed') : '';
+    return `<span class="slot${cls}">${shown?l:''}</span>`;
+  }).join('');
+  $('#melts').innerHTML = `Lives: ${Array.from({length:MAX_MELT},(_,i)=>`<span class="${i<state.wrong?'used':''}"></span>`).join('')}`;
+  stage.querySelectorAll('.key').forEach(k=>{
+    const l = k.dataset.letter, used = state.guessed.has(l);
+    k.disabled = used || state.status!=='play';
+    k.classList.toggle('hit', used && word.includes(l));
+    k.classList.toggle('miss', used && !word.includes(l));
+  });
+  const done = state.status!=='play';
+  $('#clue').innerHTML = state.clue || done
+    ? `<span class="clue-icon">${icon}</span><p class="clue-text">${done?'':'Picture clue'}</p>`
+    : `<button class="btn small ghost" type="button" data-action="clue">Picture clue</button>`;
+  const status = $('#status');
+  status.className = 'status' + (state.status==='win'?' win':state.status==='lose'?' lose':'');
+  status.innerHTML = state.status==='win' ? `${teamTag(state.solver)} got it! +${SOLVE_BONUS + 1}`
+    : state.status==='lose' ? 'Oh no! Frosty melted!'
+    : `${teamTag(state.turn)}: say a letter!`;
+  const last = state.round===state.order.length-1;
+  $('#actions').innerHTML = done ? btn(last?'See the winner 🏆':'Next word ▶','next',{primary:true}) : '';
+  $('#art').classList.toggle('dance', state.status==='win');
+  meltTo(state.wrong);
+  board.querySelectorAll('.chip').forEach((c,i)=>c.classList.toggle('turn', !done && i===state.turn));
+}
+
+function renderBoard(){
+  board.style.setProperty('--n', state.teamCount);
+  board.innerHTML = TEAMS.slice(0, state.teamCount).map((t,i)=>`<div class="chip" id="chip-${i}" style="--c:${t.color}">
+    <button class="chip-main" type="button" data-team="${i}" aria-label="Add a point for ${t.name}"><span class="chip-name">${t.icon} ${t.name}</span><span class="chip-score">${state.scores[i]}</span></button>
+    <button class="chip-minus" type="button" data-minus="${i}" aria-label="Take away a point from ${t.name}">−</button></div>`).join('')
+    + `<p class="hint">Type or click a letter · Click a team (or press 1–${state.teamCount}) to change points · Space = next</p>`;
+}
+
+function addPoint(i, delta, quiet=false){
+  state.scores[i] = Math.max(0, state.scores[i]+delta);
+  const chip = $(`#chip-${i}`);
+  if(!chip) return;
+  chip.querySelector('.chip-score').textContent = state.scores[i];
+  if(delta>0){
+    if(!quiet) sound.hit();
+    chip.classList.remove('pop'); void chip.offsetWidth; chip.classList.add('pop');
+  }
+}
+
+function guess(letter){
+  if(state.view!=='play' || state.status!=='play' || state.guessed.has(letter)) return;
+  const {word} = current(), team = state.turn;
+  state.guessed.add(letter);
+  if(word.includes(letter)){
+    addPoint(team, 1, true);
+    if(word.split('').every(l=>state.guessed.has(l))){
+      state.status = 'win'; state.solver = team;
+      addPoint(team, SOLVE_BONUS, true);
+      sound.win();
+    } else sound.hit();
+  } else {
+    state.wrong++;
+    const art = $('#art');
+    art.classList.remove('shake'); void art.offsetWidth; art.classList.add('shake');
+    if(state.wrong>=MAX_MELT){ state.status = 'lose'; sound.melt(); }
+    else sound.miss();
+  }
+  if(state.status==='play') state.turn = (state.turn+1) % state.teamCount;
+  updatePlay();
+}
+
+function startWord(){
+  state.guessed = new Set(); state.wrong = 0; state.status = 'play'; state.clue = false;
+  state.view = 'play';
+  render();
+}
+
+function finish(){
+  if(state.view==='play') state.back = {round:state.round, guessed:new Set(state.guessed), wrong:state.wrong, status:state.status, clue:state.clue, turn:state.turn};
+  sound.win();
+  state.view = 'winner';
+  render();
+}
+
+const ACTIONS = {
+  teamCount: el => { state.teamCount = +el.dataset.n; render(); },
+  wordCount: el => { state.wordCount = +el.dataset.n; render(); },
+  start:     () => { state.order = shuffle(WORDS.map((_,i)=>i)).slice(0, state.wordCount); state.round = 0; state.turn = 0; startWord(); },
+  clue:      () => { state.clue = true; updatePlay(); },
+  next:      () => {
+    if(state.round<state.order.length-1){ state.round++; state.turn = (state.turn+1) % state.teamCount; startWord(); }
+    else { state.back = null; finish(); }
+  },
+  reset:     () => { state.scores.fill(0); state.back = null; state.view = 'setup'; render(); },
+  back:      () => { Object.assign(state, state.back, {back:null, view:'play'}); render(); }
+};
+
+document.addEventListener('pointerdown', ()=>sound.init());
+
+stage.addEventListener('click', e=>{
+  const key = e.target.closest('[data-letter]');
+  if(key){ guess(key.dataset.letter); return; }
+  const el = e.target.closest('[data-action]');
+  if(el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
+});
+
+board.addEventListener('click', e=>{
+  const plus = e.target.closest('[data-team]'), minus = e.target.closest('[data-minus]');
+  if(minus) addPoint(+minus.dataset.minus, -1);
+  else if(plus) addPoint(+plus.dataset.team, 1);
+  if(e.detail>0) (minus||plus)?.blur();
+});
+
+$('#finish').addEventListener('click', e=>{ finish(); e.currentTarget.blur(); });
+$('#mute').addEventListener('click', e=>{ state.muted = !state.muted; e.currentTarget.textContent = state.muted ? '🔇 Sound' : '🔊 Sound'; e.currentTarget.blur(); });
+$('#full').addEventListener('click', e=>{
+  e.currentTarget.blur();
+  const req = document.fullscreenElement ? document.exitFullscreen?.() : document.documentElement.requestFullscreen?.();
+  req?.catch?.(()=>{});
+});
+
+document.addEventListener('keydown', e=>{
+  sound.init();
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const digit = e.code.match(/^(?:Digit|Numpad)([1-6])$/);
+  if(digit){
+    const i = +digit[1]-1;
+    if(i<state.teamCount){ e.preventDefault(); addPoint(i, e.shiftKey?-1:1); }
+    return;
+  }
+  const letter = e.code.match(/^Key([A-Z])$/);
+  if(letter && state.view==='play'){ e.preventDefault(); guess(letter[1]); return; }
+  if(['Space','Enter','ArrowRight'].includes(e.code)){
+    const primary = stage.querySelector('[data-primary]');
+    if(primary){ e.preventDefault(); primary.click(); }
+  }
+});
+
+(() => {
+  const c = $('#snow');
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ctx = c.getContext('2d'), dpr = window.devicePixelRatio || 1;
+  let W = 0, H = 0;
+  const size = () => { W = c.width = innerWidth*dpr; H = c.height = innerHeight*dpr; };
+  size(); addEventListener('resize', size);
+  const flakes = Array.from({length:90}, ()=>({x:Math.random(), y:Math.random(), r:Math.random()*2.2+.8, s:Math.random()*.0011+.0004, d:Math.random()*6.28}));
+  const loop = () => {
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = 'rgba(251,247,240,.5)';
+    for(const f of flakes){
+      f.y += f.s; f.d += .01;
+      if(f.y>1.02){ f.y = -.02; f.x = Math.random(); }
+      ctx.beginPath(); ctx.arc((f.x+Math.sin(f.d)*.01)*W, f.y*H, f.r*dpr, 0, 6.28); ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+})();
+
+render();
+}
+</script>
+</body>
+</html>
